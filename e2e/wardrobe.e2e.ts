@@ -17,6 +17,7 @@ test('cadastro, busca, look, edição, persistência e exclusão', async ({ page
     mimeType: 'image/png',
     buffer: Buffer.from(testImage, 'base64'),
   });
+  await modal.getByRole('button', { name: 'Usar foto inteira', exact: true }).click();
   await modal.getByLabel('Nome da peça').fill('Camisa de teste');
   await modal.getByLabel('Categoria').selectOption('camisas');
   await modal.getByRole('button', { name: 'Salvar no guarda-roupa' }).click();

@@ -1741,3 +1741,74 @@ main {
     scroll-behavior: auto !important;
   }
 }
+
+.crop-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.crop-controls {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.crop-ratios {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 13px;
+}
+.crop-ratios .chip {
+  flex: 1;
+  min-height: 38px;
+}
+.crop-viewport {
+  position: relative;
+  width: 100%;
+  height: clamp(210px, 39dvh, 350px);
+  background: #262b23;
+  border-radius: 12px;
+  overflow: hidden;
+  touch-action: none;
+}
+.crop-viewport.is-busy {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.crop-viewport .reactEasyCrop_Image {
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+.crop-viewport .reactEasyCrop_CropArea {
+  border: 1px solid #fcfff0;
+  color: #151a1280;
+}
+.modal .crop-zoom {
+  margin-top: 15px;
+  gap: 4px;
+}
+.crop-zoom > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #7b8969;
+  font-size: 11px;
+}
+.crop-zoom output {
+  margin-left: auto;
+}
+.modal .crop-zoom input[type='range'] {
+  accent-color: #657747;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  height: 36px;
+  cursor: pointer;
+}
+.crop-error {
+  color: #a05245;
+  font-size: 12px;
+  line-height: 1.7;
+}

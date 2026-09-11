@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   ArrowDownUp,
   ArrowRight,
@@ -6,6 +6,7 @@ import {
   CheckCheck,
   ChevronRight,
   Camera,
+  Crop,
   Heart,
   House,
   Layers3,
@@ -30,7 +31,8 @@ import {
   type Outfit,
   type Position,
 } from './data';
-import { blobToDataURL, compressImage, supabase, validateLook } from './lib';
+import { blobToDataURL, validateImage, supabase, validateLook } from './lib';
+const ImageCropEditor = lazy(() => import('./ImageCropEditor'));
 
 type Page = 'Início' | 'Guarda-roupa' | 'Looks' | 'Favoritos' | 'Perfil';
 const navigation = [
@@ -52,6 +54,9 @@ function Modal({
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  useEffect(() => {
+    ref.current?.focus();
+  }, [title]);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     const old = document.body.style.overflow;
@@ -146,6 +151,8 @@ export default function App() {
   const [preview, setPreview] = useState('');
   const [blob, setBlob] = useState<Blob | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const [look, setLook] = useState<Outfit | null>(null);
   const [picker, setPicker] = useState<Position | null>(null);
@@ -244,24 +251,22 @@ export default function App() {
     setEditor(piece || { name: '', category_id: categories[0]?.id, favorite: false });
     setPreview(piece?.image_url || piece?.image_path || '');
     setBlob(null);
+    setCropFile(null);
+    setPhotoFile(null);
     setDetail(null);
   };
-  async function choosePhoto(file?: File) {
+  function choosePhoto(file?: File) {
     if (!file) return;
-    setUploading(true);
     try {
-      const compressed = await compressImage(file);
-      setBlob(compressed);
-      setPreview(await blobToDataURL(compressed));
+      validateImage(file);
+      setCropFile(file);
     } catch (e) {
       notify(errorMessage(e));
-    } finally {
-      setUploading(false);
     }
   }
   async function savePiece(e: FormEvent) {
     e.preventDefault();
-    if (!editor || uploading) return;
+    if (!editor || uploading || cropFile) return;
     await action(async () => {
       if (!preview || !editor.category_id)
         throw new Error('Adicione uma foto e escolha uma categoria.');
@@ -303,6 +308,7 @@ export default function App() {
         editor.id ? old.map((p) => (p.id === id ? piece : p)) : [piece, ...old],
       );
       setEditor(null);
+      setPhotoFile(null);
       notify('Peça salva no seu guarda-roupa.');
     });
   }
@@ -670,11 +676,11 @@ export default function App() {
                     alt="Inspiração de estilo com roupas em tons naturais"
                   />
                   <div className="hero-photo-shade" />
-                  <span className="editorial-word">
+                  {/*<span className="editorial-word">
                     wear your
                     <br />
                     <i>own story.</i>
-                  </span>
+                  </span> */}
                   <span className="floating-label">
                     <span>✳</span> O que você tem.
                     <br />
@@ -944,6 +950,8 @@ export default function App() {
                     setClothes([]);
                     setOutfits([]);
                     setEditor(null);
+                    setCropFile(null);
+                    setPhotoFile(null);
                     setDetail(null);
                     setLook(null);
                     setConfirm(null);
@@ -975,70 +983,114 @@ export default function App() {
       </nav>
       {editor && (
         <Modal
-          title={editor.id ? 'Editar peça' : 'Uma nova possibilidade'}
+          title={cropFile ? 'Ajustar foto' : editor.id ? 'Editar peça' : 'Uma nova possibilidade'}
           onClose={() => {
-            if (!busy && !uploading) setEditor(null);
+            if (!busy && !uploading) {
+              if (cropFile) setCropFile(null);
+              else {
+                setEditor(null);
+                setPhotoFile(null);
+              }
+            }
           }}
         >
-          <form onSubmit={savePiece}>
-            <p className="muted">Um registro da sua peça. Muitos looks pela frente.</p>
-            <label className={`upload-area ${preview ? 'has-photo' : ''}`}>
-              {preview ? (
-                <img src={preview} alt="Preview da peça" />
-              ) : (
-                <>
-                  <Camera size={35} />
-                  <strong>Adicione a foto da sua peça</strong>
-                  <span>JPG, PNG ou WebP • até 20 MB</span>
-                </>
+          {cropFile ? (
+            <Suspense
+              fallback={
+                <p className="muted" role="status">
+                  Preparando editor de foto…
+                </p>
+              }
+            >
+              <ImageCropEditor
+                file={cropFile}
+                busy={uploading}
+                onBusyChange={setUploading}
+                onCancel={() => setCropFile(null)}
+                onApply={async (result) => {
+                  const url = await blobToDataURL(result);
+                  setBlob(result);
+                  setPreview(url);
+                  setPhotoFile(cropFile);
+                  setCropFile(null);
+                }}
+              />
+            </Suspense>
+          ) : (
+            <form onSubmit={savePiece}>
+              <p className="muted">Um registro da sua peça. Muitos looks pela frente.</p>
+              <label className={`upload-area ${preview ? 'has-photo' : ''}`}>
+                {preview ? (
+                  <img src={preview} alt="Preview da peça" />
+                ) : (
+                  <>
+                    <Camera size={35} />
+                    <strong>Adicione a foto da sua peça</strong>
+                    <span>JPG, PNG ou WebP • até 20 MB</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={busy || uploading}
+                  onChange={(e) => {
+                    choosePhoto(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+                <span className="upload-label">
+                  <Upload size={16} />
+                  {uploading ? 'Preparando imagem…' : preview ? 'Trocar foto' : 'Escolher foto'}
+                </span>
+              </label>
+              {photoFile && (
+                <button
+                  type="button"
+                  className="secondary full"
+                  disabled={busy || uploading}
+                  onClick={() => setCropFile(photoFile)}
+                >
+                  <Crop size={16} />
+                  Ajustar recorte
+                </button>
               )}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={busy || uploading}
-                onChange={(e) => void choosePhoto(e.target.files?.[0])}
-              />
-              <span className="upload-label">
-                <Upload size={16} />
-                {uploading ? 'Preparando imagem…' : preview ? 'Trocar foto' : 'Escolher foto'}
-              </span>
-            </label>
-            <label>
-              Nome da peça <small>opcional</small>
-              <input
-                value={editor.name || ''}
-                maxLength={100}
-                placeholder="Ex.: minha camisa de linho"
-                onChange={(e) => setEditor({ ...editor, name: e.target.value })}
-              />
-            </label>
-            <label>
-              Categoria
-              <select
-                required
-                value={editor.category_id || ''}
-                onChange={(e) => setEditor({ ...editor, category_id: e.target.value })}
-              >
-                {categories.map((c) => (
-                  <option value={c.id} key={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={!!editor.favorite}
-                onChange={(e) => setEditor({ ...editor, favorite: e.target.checked })}
-              />
-              <Heart size={17} /> É uma das minhas favoritas
-            </label>
-            <button className="primary full" disabled={busy || uploading || !preview}>
-              {busy ? 'Salvando sua peça…' : 'Salvar no guarda-roupa'}
-              <Check size={17} />
-            </button>
-          </form>
+              <label>
+                Nome da peça <small>opcional</small>
+                <input
+                  value={editor.name || ''}
+                  maxLength={100}
+                  placeholder="Ex.: minha camisa de linho"
+                  onChange={(e) => setEditor({ ...editor, name: e.target.value })}
+                />
+              </label>
+              <label>
+                Categoria
+                <select
+                  required
+                  value={editor.category_id || ''}
+                  onChange={(e) => setEditor({ ...editor, category_id: e.target.value })}
+                >
+                  {categories.map((c) => (
+                    <option value={c.id} key={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={!!editor.favorite}
+                  onChange={(e) => setEditor({ ...editor, favorite: e.target.checked })}
+                />
+                <Heart size={17} /> É uma das minhas favoritas
+              </label>
+              <button className="primary full" disabled={busy || uploading || !preview}>
+                {busy ? 'Salvando sua peça…' : 'Salvar no guarda-roupa'}
+                <Check size={17} />
+              </button>
+            </form>
+          )}
         </Modal>
       )}
       {selected && (

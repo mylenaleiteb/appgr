@@ -26,7 +26,7 @@ O Supabase precisa estar configurado para usar a aplicação. Sem as variáveis,
 ## Funcionalidades
 
 - Início com visão do acervo, guarda-roupa por categorias, busca, favoritos e ordenação.
-- Fotos com preview, validação de tipo/tamanho, redimensionamento até 1400px e compressão WebP antes do upload.
+- Fotos com preview e recorte opcional: arrastar, zoom e formatos vertical, quadrado, horizontal ou original. É possível manter a foto inteira, cancelar sem perder o formulário e reajustar o recorte antes de salvar. A imagem é recortada a partir do arquivo original, redimensionada até 1400px e comprimida em WebP antes do upload.
 - Cadastro, edição, exclusão confirmada, detalhes de peças e looks relacionados.
 - Montagem visual por posição, pré-seleção a partir de uma peça, múltiplos acessórios e sobreposições sem restrições rígidas.
 - Looks persistidos apenas como relações com peças, sem gerar imagem composta. Criação e edição dos relacionamentos acontecem em uma única transação PostgreSQL.
