@@ -1094,7 +1094,7 @@ export default function App() {
         </Modal>
       )}
       {selected && (
-        <Modal title="Uma peça, muitas possibilidades" onClose={() => setDetail(null)}>
+        <Modal title="Peça" onClose={() => setDetail(null)}>
           <div className="detail-photo">
             <Photo piece={selected} />
             <button
