@@ -1,6 +1,6 @@
 # Vesti — guarda-roupa digital
 
-Aplicação mobile-first em React, TypeScript, Tailwind CSS e Supabase. Interface em português, com demonstração local pronta para explorar.
+Aplicação mobile-first em React, TypeScript, Tailwind CSS e Supabase. Interface em português com acesso por conta autenticada.
 
 ## Executar
 
@@ -21,7 +21,7 @@ Abra a URL informada pelo Vite (normalmente http://localhost:5173).
 4. No Supabase Auth, habilite o provedor de e-mail/senha. Configure Site URL e as URLs de redirecionamento para o endereço de desenvolvimento e produção. Com confirmação de e-mail ativa, confirme o cadastro pelo link recebido antes de entrar.
 5. Reinicie `npm run dev`.
 
-Sem essas variáveis, o app inicia em demonstração. Com Supabase configurado, abre a autenticação, oferecendo também demonstração. Fotos e alterações de demonstração ficam no localStorage deste navegador e não são enviadas à conta; não é um backup. Novas contas começam vazias. As imagens de exemplo são fotos externas do Unsplash, usadas como inspiração visual, e exigem internet. Fontes externas têm fallback local.
+O Supabase precisa estar configurado para usar a aplicação. Sem as variáveis, o app mostra uma tela de indisponibilidade; com a conexão configurada, abre a autenticação. Novas contas começam vazias, e roupas, fotos e looks são salvos somente no Supabase. A imagem editorial do início é externa e exige internet. Fontes externas têm fallback local.
 
 ## Funcionalidades
 
@@ -47,7 +47,7 @@ O GitHub Pages hospeda a interface; autenticação, banco PostgreSQL e fotos con
 4. Abra **Actions → Publicar Vesti no GitHub Pages → Run workflow** ou faça um novo push na `main`. Ao terminar, o endereço aparece no deploy e em **Settings → Pages**. Normalmente será `https://SEU-USUARIO.github.io/SEU-REPOSITORIO/`.
 5. No Supabase, em **Authentication → URL Configuration**, coloque esse endereço completo, com a barra final, em **Site URL** e **Redirect URLs**. Mantenha também `http://localhost:5173/` nos redirecionamentos permitidos se continuar desenvolvendo localmente.
 
-Sem os dois secrets, a publicação abre em modo demonstração. Após adicionar ou alterar secrets, execute o workflow novamente: essas variáveis são incorporadas durante o build. Confirme cadastro por e-mail, login e upload no endereço publicado antes de compartilhar o acesso.
+Sem os dois secrets, a publicação mostra uma tela de indisponibilidade. Após adicionar ou alterar secrets, execute o workflow novamente: essas variáveis são incorporadas durante o build. Confirme cadastro por e-mail, login e upload no endereço publicado antes de compartilhar o acesso.
 
 O caminho base é detectado pelo GitHub Pages, incluindo o nome do repositório. O build local usa caminhos relativos. Não é necessário criar uma branch `gh-pages` nem publicar os arquivos TypeScript diretamente. Configurar o workflow localmente não publica o site: é preciso enviá-lo ao GitHub e habilitar Pages.
 
@@ -61,7 +61,7 @@ npm run build
 npm run preview
 ```
 
-Testes de navegador: `npm run test:e2e`. A configuração usa o Microsoft Edge instalado, em modo headless, nos tamanhos desktop e iPhone 13. Para outros ambientes, ajuste `channel` em `playwright.config.ts` e instale o navegador correspondente. Os testes devem ser executados sem credenciais Supabase, no modo demonstração. `npm run format` formata o código.
+Testes de navegador: `npm run test:e2e`. A configuração usa o Microsoft Edge instalado, em modo headless, nos tamanhos desktop e iPhone 13. Para outros ambientes, ajuste `channel` em `playwright.config.ts` e instale o navegador correspondente. Os testes iniciam um servidor isolado na porta 5174 com credenciais fictícias e interceptam as chamadas ao Supabase, sem usar a conta ou os dados reais. Cobrem login obrigatório, cadastro de peças, montagem de looks, recarga, edição, exclusão e logout. A integração com o serviço real deve ser validada separadamente. `npm run format` formata o código.
 
 O build fica em `dist/` e pode ser publicado em hospedagem estática HTTPS. Configure as variáveis `VITE_` no ambiente de build. A navegação usa estado interno e não requer regras de rewrite. O projeto não inclui credenciais nem provisiona um serviço Supabase automaticamente.
 

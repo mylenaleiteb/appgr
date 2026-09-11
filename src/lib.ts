@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Clothing, Outfit } from './data';
+import type { Outfit } from './data';
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const supabase = url && key ? createClient(url, key) : null;
@@ -29,13 +29,6 @@ export const blobToDataURL = (blob: Blob): Promise<string> =>
     r.onerror = reject;
     r.readAsDataURL(blob);
   });
-export function readDemo(): { clothes: Clothing[]; outfits: Outfit[] } | null {
-  try {
-    return JSON.parse(localStorage.getItem('vesti-demo') || 'null');
-  } catch {
-    return null;
-  }
-}
 export function validateLook(name: string, items: Outfit['items']) {
   if (!name.trim()) throw new Error('Dê um nome ao seu look.');
   if (!items.length) throw new Error('Selecione pelo menos uma peça.');

@@ -24,15 +24,13 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import {
   categories as defaults,
-  seedClothes,
-  seedOutfits,
   positions,
   type Category,
   type Clothing,
   type Outfit,
   type Position,
 } from './data';
-import { blobToDataURL, compressImage, readDemo, supabase, validateLook } from './lib';
+import { blobToDataURL, compressImage, supabase, validateLook } from './lib';
 
 type Page = 'Início' | 'Guarda-roupa' | 'Looks' | 'Favoritos' | 'Perfil';
 const navigation = [
@@ -132,7 +130,6 @@ function Photo({ piece }: { piece: Clothing }) {
 export default function App() {
   const [page, setPage] = useState<Page>('Início');
   const [session, setSession] = useState<Session | null>(null);
-  const [demo, setDemo] = useState(!supabase);
   const [authReady, setAuthReady] = useState(!supabase);
   const [clothes, setClothes] = useState<Clothing[]>([]);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
@@ -154,7 +151,6 @@ export default function App() {
   const [picker, setPicker] = useState<Position | null>(null);
   const [confirm, setConfirm] = useState<{ kind: 'piece' | 'look'; id: string } | null>(null);
   const [signup, setSignup] = useState(false);
-  const skipDemoWrite = useRef(false);
   const notify = (message: string) => setToast(message);
   useEffect(() => {
     if (!toast) return;
@@ -171,7 +167,6 @@ export default function App() {
     const { data } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setAuthReady(true);
-      if (s) setDemo(false);
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -179,13 +174,7 @@ export default function App() {
     setLoading(true);
     setLoadError(false);
     try {
-      if (demo) {
-        skipDemoWrite.current = true;
-        const saved = readDemo();
-        setClothes(saved?.clothes || seedClothes);
-        setOutfits(saved?.outfits || seedOutfits);
-        setCategories(defaults);
-      } else if (supabase && session) {
+      if (supabase && session) {
         const [c, o, cat] = await Promise.all([
           supabase.from('clothing').select('*').order('created_at', { ascending: false }),
           supabase
@@ -220,24 +209,12 @@ export default function App() {
   }
   useEffect(() => {
     void load();
-  }, [demo, session?.user.id]);
+  }, [session?.user.id]);
   useEffect(() => {
-    if (!demo || loading) return;
-    if (skipDemoWrite.current) {
-      skipDemoWrite.current = false;
-      return;
-    }
-    try {
-      localStorage.setItem('vesti-demo', JSON.stringify({ clothes, outfits }));
-    } catch {
-      notify('O armazenamento local está cheio. Remova algumas fotos para salvar as alterações.');
-    }
-  }, [clothes, outfits, demo, loading]);
-  useEffect(() => {
-    if (demo || !session) return;
+    if (!session) return;
     const timer = setInterval(() => void load(), 50 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [demo, session?.user.id]);
+  }, [session?.user.id]);
   function errorMessage(e: unknown) {
     return e instanceof Error
       ? e.message
@@ -292,15 +269,12 @@ export default function App() {
       let path = editor.image_path || '';
       let uploaded = false;
       if (blob) {
-        if (demo) path = await blobToDataURL(blob);
-        else {
-          path = `${session!.user.id}/${crypto.randomUUID()}.webp`;
-          const { error } = await supabase!.storage
-            .from('wardrobe')
-            .upload(path, blob, { contentType: 'image/webp' });
-          if (error) throw error;
-          uploaded = true;
-        }
+        path = `${session!.user.id}/${crypto.randomUUID()}.webp`;
+        const { error } = await supabase!.storage
+          .from('wardrobe')
+          .upload(path, blob, { contentType: 'image/webp' });
+        if (error) throw error;
+        uploaded = true;
       }
       const piece: Clothing = {
         id,
@@ -312,21 +286,19 @@ export default function App() {
         favorite: !!editor.favorite,
         image_path: path,
       };
-      if (!demo) {
-        const { error } = await supabase!
-          .from('clothing')
-          .upsert({ ...piece, user_id: session!.user.id });
-        if (error) {
-          if (uploaded) await supabase!.storage.from('wardrobe').remove([path]);
-          throw error;
-        }
-        if (uploaded && editor.image_path) {
-          const cleanup = await supabase!.storage.from('wardrobe').remove([editor.image_path]);
-          if (cleanup.error) notify('Peça salva. A foto anterior não pôde ser removida.');
-        }
-        const { data } = await supabase!.storage.from('wardrobe').createSignedUrl(path, 3600);
-        piece.image_url = data?.signedUrl;
+      const { error } = await supabase!
+        .from('clothing')
+        .upsert({ ...piece, user_id: session!.user.id });
+      if (error) {
+        if (uploaded) await supabase!.storage.from('wardrobe').remove([path]);
+        throw error;
       }
+      if (uploaded && editor.image_path) {
+        const cleanup = await supabase!.storage.from('wardrobe').remove([editor.image_path]);
+        if (cleanup.error) notify('Peça salva. A foto anterior não pôde ser removida.');
+      }
+      const { data } = await supabase!.storage.from('wardrobe').createSignedUrl(path, 3600);
+      piece.image_url = data?.signedUrl;
       setClothes((old) =>
         editor.id ? old.map((p) => (p.id === id ? piece : p)) : [piece, ...old],
       );
@@ -338,13 +310,11 @@ export default function App() {
     await action(async () => {
       const list = kind === 'piece' ? clothes : outfits;
       const item = list.find((i) => i.id === id)!;
-      if (!demo) {
-        const { error } = await supabase!
-          .from(kind === 'piece' ? 'clothing' : 'outfits')
-          .update({ favorite: !item.favorite })
-          .eq('id', id);
-        if (error) throw error;
-      }
+      const { error } = await supabase!
+        .from(kind === 'piece' ? 'clothing' : 'outfits')
+        .update({ favorite: !item.favorite })
+        .eq('id', id);
+      if (error) throw error;
       if (kind === 'piece')
         setClothes((old) => old.map((p) => (p.id === id ? { ...p, favorite: !p.favorite } : p)));
       else setOutfits((old) => old.map((p) => (p.id === id ? { ...p, favorite: !p.favorite } : p)));
@@ -372,15 +342,13 @@ export default function App() {
     await action(async () => {
       validateLook(look.name, look.items);
       const clean = { ...look, name: look.name.trim() };
-      if (!demo) {
-        const { error } = await supabase!.rpc('save_outfit', {
-          p_id: clean.id,
-          p_name: clean.name,
-          p_favorite: clean.favorite,
-          p_items: clean.items,
-        });
-        if (error) throw error;
-      }
+      const { error } = await supabase!.rpc('save_outfit', {
+        p_id: clean.id,
+        p_name: clean.name,
+        p_favorite: clean.favorite,
+        p_items: clean.items,
+      });
+      if (error) throw error;
       setOutfits((old) =>
         old.some((o) => o.id === clean.id)
           ? old.map((o) => (o.id === clean.id ? clean : o))
@@ -394,13 +362,11 @@ export default function App() {
   async function remove() {
     if (!confirm) return;
     await action(async () => {
-      if (!demo) {
-        const { error } = await supabase!
-          .from(confirm.kind === 'piece' ? 'clothing' : 'outfits')
-          .delete()
-          .eq('id', confirm.id);
-        if (error) throw error;
-      }
+      const { error } = await supabase!
+        .from(confirm.kind === 'piece' ? 'clothing' : 'outfits')
+        .delete()
+        .eq('id', confirm.id);
+      if (error) throw error;
       if (confirm.kind === 'piece') {
         const piece = clothes.find((c) => c.id === confirm.id);
         setClothes((old) => old.filter((p) => p.id !== confirm.id));
@@ -408,7 +374,7 @@ export default function App() {
           old.map((o) => ({ ...o, items: o.items.filter((i) => i.clothing_id !== confirm.id) })),
         );
         setDetail(null);
-        if (!demo && piece) {
+        if (piece) {
           const { error } = await supabase!.storage.from('wardrobe').remove([piece.image_path]);
           if (error) notify('Peça excluída. Não foi possível limpar a foto do Storage.');
         }
@@ -500,6 +466,21 @@ export default function App() {
       </button>
     </div>
   );
+  if (!supabase)
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <span className="brand">
+            vesti<span>✳</span>
+          </span>
+          <h1>Voltamos em breve.</h1>
+          <p>Não foi possível conectar ao seu guarda-roupa. Tente novamente mais tarde.</p>
+          <button className="secondary" onClick={() => window.location.reload()}>
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
   if (!authReady)
     return (
       <div className="auth-screen">
@@ -509,7 +490,7 @@ export default function App() {
         <p>Preparando seu espaço…</p>
       </div>
     );
-  if (!demo && !session)
+  if (!session)
     return (
       <div className="auth-screen">
         <div className="auth-card">
@@ -570,9 +551,6 @@ export default function App() {
           <button className="text-button" onClick={() => setSignup(!signup)}>
             {signup ? 'Já tenho uma conta' : 'Ainda não tenho uma conta'}
           </button>
-          <button className="secondary" onClick={() => setDemo(true)}>
-            Explorar demonstração <ArrowRight size={16} />
-          </button>
         </div>
         {toast && (
           <div className="toast" role="status">
@@ -618,10 +596,10 @@ export default function App() {
           <span>Redescubra o que já é seu.</span>
         </div>
         <button className="account" onClick={() => go('Perfil')}>
-          <div className="avatar">{demo ? 'V' : name[0].toUpperCase()}</div>
+          <div className="avatar">{name[0].toUpperCase()}</div>
           <div>
-            <strong>{demo ? 'Seu espaço criativo' : name}</strong>
-            <span>{demo ? 'Modo demonstração' : 'Meu guarda-roupa'}</span>
+            <strong>{name}</strong>
+            <span>Meu guarda-roupa</span>
           </div>
           <ChevronRight size={16} />
         </button>
@@ -637,10 +615,10 @@ export default function App() {
           </div>
           <div className="topbar-right">
             <span className="private-label">
-              <span /> {demo ? 'Experimente. Combine. Inspire-se.' : 'Um espaço só seu'}
+              <span /> Um espaço só seu
             </span>
             <button className="avatar" aria-label="Meu perfil" onClick={() => go('Perfil')}>
-              {demo ? 'V' : name[0].toUpperCase()}
+              {name[0].toUpperCase()}
             </button>
           </div>
         </header>
@@ -939,13 +917,9 @@ export default function App() {
           )}
           {page === 'Perfil' && (
             <section className="profile-panel">
-              <div className="avatar large">{demo ? 'V' : name[0]}</div>
-              <h2>{demo ? 'Seu espaço de experimentação' : name}</h2>
-              <p>
-                {demo
-                  ? 'Você está no modo demonstração. As alterações ficam salvas apenas neste navegador.'
-                  : session?.user.email}
-              </p>
+              <div className="avatar large">{name[0].toUpperCase()}</div>
+              <h2>{name}</h2>
+              <p>{session.user.email}</p>
               <div className="profile-row">
                 <Shirt />
                 <span>Peças cadastradas</span>
@@ -958,47 +932,37 @@ export default function App() {
               </div>
               <div className="profile-row">
                 <CheckCheck />
-                <span>
-                  {demo
-                    ? 'Armazenamento local de demonstração'
-                    : 'Fotos privadas e dados protegidos por conta'}
-                </span>
+                <span>Fotos privadas e dados protegidos por conta</span>
               </div>
-              {demo && !supabase && (
-                <p className="notice">
-                  Para usar sua conta e sincronizar o guarda-roupa, configure as variáveis do
-                  Supabase conforme o README do projeto.
-                </p>
-              )}
-              {supabase && (
-                <button
-                  className="primary"
-                  onClick={() =>
-                    void action(async () => {
-                      if (!demo) {
-                        const { error } = await supabase!.auth.signOut();
-                        if (error) throw error;
-                      }
-                      setDemo(false);
-                      setClothes([]);
-                      setOutfits([]);
-                      go('Início');
-                    })
-                  }
-                >
-                  <LogOut size={17} />
-                  {demo ? 'Entrar na minha conta' : 'Sair da conta'}
-                </button>
-              )}
+              <button
+                className="primary"
+                onClick={() =>
+                  void action(async () => {
+                    const { error } = await supabase!.auth.signOut();
+                    if (error) throw error;
+                    setSession(null);
+                    setClothes([]);
+                    setOutfits([]);
+                    setEditor(null);
+                    setDetail(null);
+                    setLook(null);
+                    setConfirm(null);
+                    go('Início');
+                  })
+                }
+              >
+                <LogOut size={17} />
+                Sair da conta
+              </button>
             </section>
           )}
-          <footer className="footer">
+          {/*<footer className="footer">
             <span className="brand">
               vesti<span>✳</span>
             </span>
             <span>Menos excesso. Mais essência.</span>
             <span>Feito para o seu jeito de vestir.</span>
-          </footer>
+          </footer>*/}
         </main>
       </div>
       <nav className="bottom-nav" aria-label="Navegação principal">

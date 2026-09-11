@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, login } from './supabase-fixture';
 test('cadastro, busca, look, edição, persistência e exclusão', async ({ page }) => {
-  await page.goto('/');
+  await login(page);
   await page.getByRole('button', { name: 'Adicionar peça', exact: true }).first().click();
   const modal = page.getByRole('dialog');
   const testImage = await page.evaluate(() => {
@@ -48,17 +48,52 @@ test('cadastro, busca, look, edição, persistência e exclusão', async ({ page
     '0 peças',
   );
 });
-test('layout sem overflow e navegação por favoritos', async ({ page }, testInfo) => {
-  await page.goto('/');
-  await expect(page.locator('.piece-card')).toHaveCount(4);
+test('conta nova sem peças de exemplo, layout sem overflow e favoritos vazios', async ({
+  page,
+}, testInfo) => {
+  await login(page);
+  await expect(page.locator('.piece-card')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const navigation = page.locator(
     testInfo.project.name === 'mobile' ? '.bottom-nav' : '.sidebar nav',
   );
   await navigation.getByRole('button', { name: 'Favoritos', exact: true }).click();
-  await expect(page.locator('.piece-card')).toHaveCount(3);
+  await expect(page.locator('.piece-card')).toHaveCount(0);
+  await expect(page.getByText('Seu estilo começa aqui', { exact: true })).toBeVisible();
   await page.screenshot({
     path: `test-results/${testInfo.project.name}-favorites.png`,
     fullPage: true,
   });
+});
+
+test('exige login apesar dos dados antigos locais e retorna à entrada após sair', async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'vesti-demo',
+      JSON.stringify({ clothes: [{ id: 'old', name: 'Peça antiga' }], outfits: [] }),
+    ),
+  );
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /demonstração/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Adicionar peça', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Ainda não tenho uma conta' }).click();
+  await expect(page.getByRole('button', { name: 'Criar minha conta' })).toBeVisible();
+  await page.getByRole('button', { name: 'Já tenho uma conta' }).click();
+  await login(page);
+  await page
+    .locator(testInfo.project.name === 'mobile' ? '.bottom-nav' : '.sidebar nav')
+    .getByRole('button', {
+      name: testInfo.project.name === 'mobile' ? 'Perfil' : 'Meu perfil',
+      exact: true,
+    })
+    .click();
+  await expect(page.locator('.profile-panel')).toContainText('teste@example.com');
+  await expect(page.getByText(/demonstração/i)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Sair da conta' }).click();
+  await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible();
 });
