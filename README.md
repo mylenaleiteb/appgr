@@ -1,0 +1,70 @@
+# Vesti — guarda-roupa digital
+
+Aplicação mobile-first em React, TypeScript, Tailwind CSS e Supabase. Interface em português, com demonstração local pronta para explorar.
+
+## Executar
+
+Requer Node.js 20.19+ (recomendado Node 22).
+
+```sh
+npm install
+npm run dev
+```
+
+Abra a URL informada pelo Vite (normalmente http://localhost:5173).
+
+## Conectar o Supabase
+
+1. Crie um projeto Supabase.
+2. Execute `supabase/migrations/001_initial.sql` no SQL Editor de um projeto novo. A migration cria tabelas, categorias, índices, RLS, função transacional para salvar looks e bucket privado `wardrobe`.
+3. Copie `.env.example` para `.env` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` com a URL do projeto e sua chave pública anon/publishable. Nunca use a chave service_role no frontend.
+4. No Supabase Auth, habilite o provedor de e-mail/senha. Configure Site URL e as URLs de redirecionamento para o endereço de desenvolvimento e produção. Com confirmação de e-mail ativa, confirme o cadastro pelo link recebido antes de entrar.
+5. Reinicie `npm run dev`.
+
+Sem essas variáveis, o app inicia em demonstração. Com Supabase configurado, abre a autenticação, oferecendo também demonstração. Fotos e alterações de demonstração ficam no localStorage deste navegador e não são enviadas à conta; não é um backup. Novas contas começam vazias. As imagens de exemplo são fotos externas do Unsplash, usadas como inspiração visual, e exigem internet. Fontes externas têm fallback local.
+
+## Funcionalidades
+
+- Início com visão do acervo, guarda-roupa por categorias, busca, favoritos e ordenação.
+- Fotos com preview, validação de tipo/tamanho, redimensionamento até 1400px e compressão WebP antes do upload.
+- Cadastro, edição, exclusão confirmada, detalhes de peças e looks relacionados.
+- Montagem visual por posição, pré-seleção a partir de uma peça, múltiplos acessórios e sobreposições sem restrições rígidas.
+- Looks persistidos apenas como relações com peças, sem gerar imagem composta. Criação e edição dos relacionamentos acontecem em uma única transação PostgreSQL.
+- Autenticação, logout, fotos privadas com URLs temporárias renovadas durante a sessão, RLS por conta e navegação inferior no mobile.
+- Estados vazios, skeleton, feedback de ações, suporte a redução de movimento e modais com controle de foco e Escape.
+
+O bucket é `wardrobe`; o objeto tem caminho `{user_id}/{uuid}.webp`, formando `wardrobe/{user_id}/{uuid}.webp`. Categorias são dados, não enums: novas categorias podem ser inseridas por administradores no banco com um dos seis tipos funcionais. Excluir uma peça remove as relações, preservando os looks, que podem ser completados novamente. Exclusões/alterações do banco e Storage são operações separadas: falhas na limpeza de fotos são comunicadas; para produção em grande escala, recomenda-se rotina de limpeza de objetos órfãos.
+
+## Validação e publicação
+
+### Publicar no GitHub Pages
+
+O GitHub Pages hospeda a interface; autenticação, banco PostgreSQL e fotos continuam no Supabase. O workflow `.github/workflows/deploy.yml` já instala dependências, testa, gera o build e publica automaticamente quando a branch `main` recebe um push.
+
+1. Envie os arquivos do projeto para seu repositório, incluindo `package-lock.json` e `.github/workflows/deploy.yml`. Não envie `.env` nem `node_modules`. Se a branch principal tiver outro nome, ajuste `branches: [main]` no workflow.
+2. No repositório, abra **Settings → Pages → Build and deployment → Source** e selecione **GitHub Actions**.
+3. Para usar contas reais, execute a migration no Supabase conforme a seção anterior. No GitHub, abra **Settings → Secrets and variables → Actions → New repository secret** e adicione `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` usando os mesmos valores públicos do `.env` local. Use somente a chave anon/publishable, nunca service_role ou chave secreta do Supabase. Os valores `VITE_` entram no JavaScript publicado; a proteção dos dados é feita pelas políticas RLS.
+4. Abra **Actions → Publicar Vesti no GitHub Pages → Run workflow** ou faça um novo push na `main`. Ao terminar, o endereço aparece no deploy e em **Settings → Pages**. Normalmente será `https://SEU-USUARIO.github.io/SEU-REPOSITORIO/`.
+5. No Supabase, em **Authentication → URL Configuration**, coloque esse endereço completo, com a barra final, em **Site URL** e **Redirect URLs**. Mantenha também `http://localhost:5173/` nos redirecionamentos permitidos se continuar desenvolvendo localmente.
+
+Sem os dois secrets, a publicação abre em modo demonstração. Após adicionar ou alterar secrets, execute o workflow novamente: essas variáveis são incorporadas durante o build. Confirme cadastro por e-mail, login e upload no endereço publicado antes de compartilhar o acesso.
+
+O caminho base é detectado pelo GitHub Pages, incluindo o nome do repositório. O build local usa caminhos relativos. Não é necessário criar uma branch `gh-pages` nem publicar os arquivos TypeScript diretamente. Configurar o workflow localmente não publica o site: é preciso enviá-lo ao GitHub e habilitar Pages.
+
+Referências: [deploy Vite no GitHub Pages](https://vite.dev/guide/static-deploy.html#github-pages), [redirecionamentos do Supabase Auth](https://supabase.com/docs/guides/auth/redirect-urls).
+
+### Verificar localmente
+
+```sh
+npm test
+npm run build
+npm run preview
+```
+
+Testes de navegador: `npm run test:e2e`. A configuração usa o Microsoft Edge instalado, em modo headless, nos tamanhos desktop e iPhone 13. Para outros ambientes, ajuste `channel` em `playwright.config.ts` e instale o navegador correspondente. Os testes devem ser executados sem credenciais Supabase, no modo demonstração. `npm run format` formata o código.
+
+O build fica em `dist/` e pode ser publicado em hospedagem estática HTTPS. Configure as variáveis `VITE_` no ambiente de build. A navegação usa estado interno e não requer regras de rewrite. O projeto não inclui credenciais nem provisiona um serviço Supabase automaticamente.
+
+Para verificar a integração real após a configuração: crie duas contas, cadastre e edite uma foto, salve um look, recarregue a página, teste favoritos e exclusão; confirme que a segunda conta não acessa os dados nem os objetos Storage da primeira.
+
+Referências: [Supabase Auth](https://supabase.com/docs/reference/javascript/auth-signinwithpassword), [controle de acesso ao Storage](https://supabase.com/docs/guides/storage/security/access-control).
