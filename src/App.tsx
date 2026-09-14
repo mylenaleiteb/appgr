@@ -26,6 +26,7 @@ import type { Session } from '@supabase/supabase-js';
 import {
   categories as defaults,
   positions,
+  colors,
   type Category,
   type Clothing,
   type Outfit,
@@ -143,6 +144,9 @@ export default function App() {
   const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
+  const [color, setColor] = useState('all');
+  const [pickerCategory, setPickerCategory] = useState('all');
+  const [pickerColor, setPickerColor] = useState('all');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [sort, setSort] = useState(false);
   const [toast, setToast] = useState('');
@@ -244,6 +248,7 @@ export default function App() {
     setPage(next);
     setQuery('');
     setCategory('all');
+    setColor('all');
     setFavoritesOnly(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -288,6 +293,7 @@ export default function App() {
           categories.find((c) => c.id === editor.category_id)?.name ||
           'Minha peça',
         category_id: editor.category_id,
+        color: editor.color || null,
         favorite: !!editor.favorite,
         image_path: path,
       };
@@ -397,6 +403,7 @@ export default function App() {
   let filtered = clothes.filter(
     (p) =>
       (category === 'all' || p.category_id === category) &&
+      (color === 'all' || (p.color || 'none') === color) &&
       (!(favoritesOnly || page === 'Favoritos') || p.favorite) &&
       p.name.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')),
   );
@@ -806,6 +813,18 @@ export default function App() {
                     </button>
                   ))}
                 </div>
+                <label className="color-filter">
+                  Cor
+                  <select value={color} onChange={(e) => setColor(e.target.value)}>
+                    <option value="all">Todas as cores</option>
+                    <option value="none">Sem cor informada</option>
+                    {colors.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <div className="search-row">
                   <label className="search">
                     <Search size={17} />
@@ -871,7 +890,7 @@ export default function App() {
                 </div>
               ) : (
                 empty(
-                  query || category !== 'all' || favoritesOnly
+                  query || category !== 'all' || color !== 'all' || favoritesOnly
                     ? 'Nenhuma peça por aqui'
                     : 'Seu estilo começa aqui',
                   query
@@ -1077,6 +1096,20 @@ export default function App() {
                   ))}
                 </select>
               </label>
+              <label>
+                Cor <small>opcional</small>
+                <select
+                  value={editor.color || ''}
+                  onChange={(e) => setEditor({ ...editor, color: e.target.value || null })}
+                >
+                  <option value="">Sem cor informada</option>
+                  {colors.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="checkbox">
                 <input
                   type="checkbox"
@@ -1110,6 +1143,7 @@ export default function App() {
             {categories.find((c) => c.id === selected.category_id)?.name}
           </span>
           <h2 className="detail-title">{selected.name}</h2>
+          <p className="muted">Cor: {selected.color || 'Sem cor informada'}</p>
           <button className="primary full" onClick={() => startLook(selected)}>
             <Sparkles size={17} />
             Montar look com esta peça
@@ -1213,7 +1247,11 @@ export default function App() {
                     <button
                       className="slot-add"
                       type="button"
-                      onClick={() => setPicker(picker === position ? null : position)}
+                      onClick={() => {
+                        setPicker(picker === position ? null : position);
+                        setPickerCategory('all');
+                        setPickerColor('all');
+                      }}
                     >
                       <Plus size={18} />
                       {look.items.some((i) => i.position === position) && position !== 'ACCESSORY'
@@ -1222,43 +1260,86 @@ export default function App() {
                     </button>
                   </div>
                   {picker === position && (
-                    <div className="picker">
-                      {clothes
-                        .filter(
+                    <div>
+                      <div className="picker-filters">
+                        <label>
+                          Tipo de peça
+                          <select
+                            value={pickerCategory}
+                            onChange={(e) => setPickerCategory(e.target.value)}
+                          >
+                            <option value="all">Todos os tipos</option>
+                            {categories
+                              .filter((c) => c.type === position)
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                        <label>
+                          Cor
+                          <select
+                            aria-label="Cor"
+                            value={pickerColor}
+                            onChange={(e) => setPickerColor(e.target.value)}
+                          >
+                            <option value="all">Todas as cores</option>
+                            <option value="none">Sem cor informada</option>
+                            {colors.map((value) => (
+                              <option key={value} value={value}>
+                                {value}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <div className="picker">
+                        {clothes
+                          .filter(
+                            (c) =>
+                              categories.find((cat) => cat.id === c.category_id)?.type ===
+                                position &&
+                              !look.items.some((i) => i.clothing_id === c.id) &&
+                              (pickerCategory === 'all' || c.category_id === pickerCategory) &&
+                              (pickerColor === 'all' || (c.color || 'none') === pickerColor),
+                          )
+                          .map((c) => (
+                            <button
+                              type="button"
+                              key={c.id}
+                              onClick={() => {
+                                setLook({
+                                  ...look,
+                                  items: [
+                                    ...look.items.filter(
+                                      (i) => position === 'ACCESSORY' || i.position !== position,
+                                    ),
+                                    { clothing_id: c.id, position },
+                                  ],
+                                });
+                                setPicker(null);
+                              }}
+                            >
+                              <Photo piece={c} />
+                              <span>{c.name}</span>
+                            </button>
+                          ))}
+                        {!clothes.some(
                           (c) =>
                             categories.find((cat) => cat.id === c.category_id)?.type === position &&
-                            !look.items.some((i) => i.clothing_id === c.id),
-                        )
-                        .map((c) => (
-                          <button
-                            type="button"
-                            key={c.id}
-                            onClick={() => {
-                              setLook({
-                                ...look,
-                                items: [
-                                  ...look.items.filter(
-                                    (i) => position === 'ACCESSORY' || i.position !== position,
-                                  ),
-                                  { clothing_id: c.id, position },
-                                ],
-                              });
-                              setPicker(null);
-                            }}
-                          >
-                            <Photo piece={c} />
-                            <span>{c.name}</span>
-                          </button>
-                        ))}
-                      {!clothes.some(
-                        (c) =>
-                          categories.find((cat) => cat.id === c.category_id)?.type === position &&
-                          !look.items.some((i) => i.clothing_id === c.id),
-                      ) && (
-                        <p>
-                          Nenhuma outra peça nesta posição. Cadastre novas peças no guarda-roupa.
-                        </p>
-                      )}
+                            !look.items.some((i) => i.clothing_id === c.id) &&
+                            (pickerCategory === 'all' || c.category_id === pickerCategory) &&
+                            (pickerColor === 'all' || (c.color || 'none') === pickerColor),
+                        ) && (
+                          <p>
+                            {pickerCategory !== 'all' || pickerColor !== 'all'
+                              ? 'Nenhuma peça encontrada com esses filtros. Altere o tipo ou a cor.'
+                              : 'Nenhuma outra peça nesta posição. Cadastre novas peças no guarda-roupa.'}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

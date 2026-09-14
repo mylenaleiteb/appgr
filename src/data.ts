@@ -4,6 +4,7 @@ export type Clothing = {
   id: string;
   name: string;
   category_id: string;
+  color?: string | null;
   favorite: boolean;
   image_path: string;
   image_url?: string;
@@ -34,3 +35,21 @@ export const categories: Category[] = [
   ['calcados', 'Calçados', 'SHOES'],
   ['acessorios', 'Acessórios', 'ACCESSORY'],
 ].map(([id, name, type]) => ({ id, name, type: type as Position }));
+
+export const colors = [
+  'Preto',
+  'Branco',
+  'Cinza',
+  'Bege',
+  'Marrom',
+  'Azul',
+  'Verde',
+  'Amarelo',
+  'Laranja',
+  'Vermelho',
+  'Rosa',
+  'Roxo',
+  'Dourado',
+  'Prateado',
+  'Multicolorido',
+];

@@ -1812,3 +1812,27 @@ main {
   font-size: 12px;
   line-height: 1.7;
 }
+
+.color-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+}
+.color-filter select {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #deded5;
+  border-radius: 8px;
+  background: white;
+  font: inherit;
+}
+.picker-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.picker-filters label {
+  flex: 1 1 140px;
+  min-width: 0;
+}
