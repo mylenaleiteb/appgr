@@ -51,5 +51,6 @@ export const colors = [
   'Roxo',
   'Dourado',
   'Prateado',
+  'Terracota',
   'Multicolorido',
 ];
